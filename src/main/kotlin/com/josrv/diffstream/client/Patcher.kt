@@ -1,28 +1,33 @@
 package com.josrv.diffstream.client
 
+import com.josrv.diffstream.Diff
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.nio.file.Path
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+
+const val PATCH_QUEUE_SIZE = 1024
 
 class Patcher(
         val file: Path
 ) {
     //TODO use PriorityBlockingQueue sorted by diff sequence number
-    private val patchQueue = LinkedBlockingQueue<String>()
-    private var running = false
+    private val patchQueue = ArrayBlockingQueue<Diff>(PATCH_QUEUE_SIZE)
+    private val running = AtomicBoolean(false)
 
     fun applyPatch(patch: String) {
-        patchQueue.add(patch)
+        patchQueue.put(patch)
     }
 
     fun start() {
-        running = true
-        while (running) {
-            val patch = patchQueue.poll(100, TimeUnit.DAYS)
+        running.set(true)
+        while (running.get()) {
+            val patch = patchQueue.take()
 
             val patchProcess = ProcessBuilder("patch", file.toString())
                     .start()
@@ -35,6 +40,6 @@ class Patcher(
     }
 
     fun stop() {
-        running = false
+        running.set(false)
     }
 }
